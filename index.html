@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xsukax Bookmark Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+        .notification { position: fixed; top: 1rem; right: 1rem; z-index: 1000; animation: slideIn 0.3s ease; max-width: 24rem; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center; animation: fadeIn 0.2s; }
+        .modal.show { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .bookmark-item:hover { background-color: #f6f8fa; }
+        .category-header { cursor: pointer; user-select: none; }
+        .btn { transition: all 0.2s ease; }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="notification-container"></div>
+
+    <div class="max-w-5xl mx-auto px-4 py-8">
+        <header class="mb-8">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">X</div>
+                <h1 class="text-3xl font-bold text-gray-900">xsukax Bookmark Manager</h1>
+            </div>
+            <p class="text-gray-600 ml-13">Organize, share, and export your bookmarks with end-to-end encryption</p>
+        </header>
+
+        <div class="bg-white rounded-lg border border-gray-300 shadow-sm p-6 mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Add Bookmark</h2>
+            <form id="bookmark-form" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                        <input type="url" id="url" required placeholder="https://example.com" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
+                        <input type="text" id="label" required placeholder="Website Name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <input type="text" id="category" list="category-list" placeholder="General" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <datalist id="category-list"></datalist>
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" class="btn bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium">Add Bookmark</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-300 shadow-sm p-6 mb-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-gray-900">Your Bookmarks <span id="bookmark-count" class="text-sm font-normal text-gray-600">(0)</span></h2>
+                <div class="flex gap-2">
+                    <button id="generate-url-btn" class="btn bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 text-sm font-medium">Share</button>
+                    <button id="export-html-btn" class="btn bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-medium">Export HTML</button>
+                    <button id="clear-all-btn" class="btn bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 text-sm font-medium">Clear All</button>
+                </div>
+            </div>
+            <div id="bookmarks-list">
+                <div id="empty-state" class="text-center py-12 text-gray-500">
+                    <div class="text-5xl mb-3">📑</div>
+                    <p class="text-lg mb-1">No bookmarks yet</p>
+                    <p class="text-sm">Add your first bookmark above to get started</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-300 shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">How It Works</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div class="border border-gray-200 rounded-md p-4">
+                    <div class="text-2xl mb-2">📌</div>
+                    <h3 class="font-semibold text-gray-900 mb-1">Add & Organize</h3>
+                    <p class="text-gray-600">Create bookmarks with custom labels and categories for easy organization.</p>
+                </div>
+                <div class="border border-gray-200 rounded-md p-4">
+                    <div class="text-2xl mb-2">🔒</div>
+                    <h3 class="font-semibold text-gray-900 mb-1">Share Securely</h3>
+                    <p class="text-gray-600">Generate encrypted shareable links protected with AES-256 encryption.</p>
+                </div>
+                <div class="border border-gray-200 rounded-md p-4">
+                    <div class="text-2xl mb-2">💾</div>
+                    <h3 class="font-semibold text-gray-900 mb-1">Export</h3>
+                    <p class="text-gray-600">Export bookmarks as HTML file compatible with Chrome and other browsers.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="password-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Set Encryption Password</h3>
+            <p class="text-gray-600 mb-4 text-sm">Enter a strong password to encrypt your bookmarks. This password is required to view the shared bookmarks.</p>
+            <form id="password-form">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Enter password">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                    <input type="password" id="confirm-password" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Confirm password">
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="cancel-password-btn" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 font-medium">Cancel</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium">Generate URL</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="share-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Share Your Bookmarks</h3>
+            <p class="text-gray-600 mb-4 text-sm">Copy the URL below. Recipients need the password to decrypt and view the bookmarks.</p>
+            <div class="flex mb-4">
+                <input type="text" id="share-url" readonly class="flex-grow px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-sm">
+                <button id="copy-url-btn" class="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 font-medium">Copy</button>
+            </div>
+            <div class="flex justify-end">
+                <button id="close-share-modal" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 font-medium">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="decrypt-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Enter Password</h3>
+            <p class="text-gray-600 mb-4 text-sm">This URL contains encrypted bookmarks. Enter the password to decrypt and view them.</p>
+            <form id="decrypt-form">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="decrypt-password" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Enter password">
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="cancel-decrypt-btn" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 font-medium">Cancel</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium">Decrypt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="rename-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Rename Category</h3>
+            <form id="rename-form">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">New Category Name</label>
+                    <input type="text" id="new-category-name" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Enter new name">
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="cancel-rename-btn" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 font-medium">Cancel</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium">Rename</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="confirmation-modal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Confirm Action</h3>
+            <p id="confirmation-message" class="text-gray-600 mb-6 text-sm">Are you sure you want to proceed?</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancel-confirm-btn" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 font-medium">Cancel</button>
+                <button id="confirm-action-btn" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 font-medium">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const state = { bookmarks: [], categories: [], collapsedCategories: {}, currentCategoryToRename: null };
+        const STORAGE_KEY = 'xsukaxBookmarkManager';
+
+        function init() {
+            loadFromStorage();
+            renderBookmarks();
+            updateCategoryList();
+            setupEventListeners();
+            checkForSharedBookmarks();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('bookmark-form').addEventListener('submit', handleAddBookmark);
+            document.getElementById('generate-url-btn').addEventListener('click', showPasswordModal);
+            document.getElementById('export-html-btn').addEventListener('click', exportToHtml);
+            document.getElementById('clear-all-btn').addEventListener('click', confirmClearAll);
+            document.getElementById('password-form').addEventListener('submit', handleGenerateUrl);
+            document.getElementById('decrypt-form').addEventListener('submit', handleDecryptBookmarks);
+            document.getElementById('rename-form').addEventListener('submit', handleRenameCategory);
+            document.getElementById('copy-url-btn').addEventListener('click', copyShareUrl);
+            document.getElementById('close-share-modal').addEventListener('click', () => hideModal('share-modal'));
+            document.getElementById('cancel-password-btn').addEventListener('click', () => hideModal('password-modal'));
+            document.getElementById('cancel-decrypt-btn').addEventListener('click', () => hideModal('decrypt-modal'));
+            document.getElementById('cancel-rename-btn').addEventListener('click', () => hideModal('rename-modal'));
+            document.getElementById('cancel-confirm-btn').addEventListener('click', () => hideModal('confirmation-modal'));
+            document.getElementById('confirm-action-btn').addEventListener('click', handleConfirmedAction);
+        }
+
+        function handleAddBookmark(e) {
+            e.preventDefault();
+            const url = document.getElementById('url').value.trim();
+            const label = document.getElementById('label').value.trim();
+            let category = document.getElementById('category').value.trim() || "General";
+            
+            if (!url || !label) {
+                showNotification('Please fill in all required fields', 'error');
+                return;
+            }
+
+            state.bookmarks.push({ id: Date.now().toString(), url, label, category });
+            
+            if (!state.categories.includes(category)) {
+                state.categories.push(category);
+                updateCategoryList();
+            }
+            
+            document.getElementById('bookmark-form').reset();
+            renderBookmarks();
+            saveToStorage();
+            showNotification('Bookmark added successfully', 'success');
+        }
+
+        function updateCategoryList() {
+            document.getElementById('category-list').innerHTML = state.categories.map(cat => `<option value="${cat}">`).join('');
+        }
+
+        function renderBookmarks() {
+            const count = state.bookmarks.length;
+            document.getElementById('bookmark-count').textContent = `(${count})`;
+            
+            if (count === 0) {
+                document.getElementById('empty-state').classList.remove('hidden');
+                document.getElementById('bookmarks-list').innerHTML = '<div id="empty-state" class="text-center py-12 text-gray-500"><div class="text-5xl mb-3">📑</div><p class="text-lg mb-1">No bookmarks yet</p><p class="text-sm">Add your first bookmark above to get started</p></div>';
+                return;
+            }
+            
+            const bookmarksByCategory = {};
+            state.bookmarks.forEach(bookmark => {
+                if (!bookmarksByCategory[bookmark.category]) bookmarksByCategory[bookmark.category] = [];
+                bookmarksByCategory[bookmark.category].push(bookmark);
+            });
+            
+            let html = '';
+            Object.keys(bookmarksByCategory).forEach(category => {
+                const isCollapsed = state.collapsedCategories[category];
+                const bookmarks = bookmarksByCategory[category];
+                
+                html += `
+                    <div class="border border-gray-300 rounded-lg mb-3 overflow-hidden">
+                        <div class="category-header bg-gray-100 px-4 py-3 flex justify-between items-center" onclick="toggleCategory('${category}')">
+                            <h3 class="font-semibold text-gray-900">📁 ${category} <span class="text-sm font-normal text-gray-600">(${bookmarks.length})</span></h3>
+                            <div class="flex items-center gap-2">
+                                <button onclick="event.stopPropagation(); editCategory('${category}')" class="text-gray-600 hover:text-blue-600 px-2">✏️</button>
+                                <span class="text-gray-600">${isCollapsed ? '▼' : '▲'}</span>
+                            </div>
+                        </div>
+                        <div class="${isCollapsed ? 'hidden' : ''}">
+                            ${bookmarks.map(bookmark => `
+                                <div class="bookmark-item px-4 py-3 flex justify-between items-center border-t border-gray-200">
+                                    <div class="flex-1 min-w-0">
+                                        <a href="${bookmark.url}" target="_blank" class="font-medium text-blue-600 hover:underline">${bookmark.label}</a>
+                                        <p class="text-sm text-gray-500 truncate">${bookmark.url}</p>
+                                    </div>
+                                    <div class="flex gap-2 ml-4">
+                                        <button onclick="editBookmark('${bookmark.id}')" class="text-gray-600 hover:text-blue-600 px-2">✏️</button>
+                                        <button onclick="deleteBookmark('${bookmark.id}')" class="text-gray-600 hover:text-red-600 px-2">🗑️</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('bookmarks-list').innerHTML = html;
+        }
+
+        function toggleCategory(category) {
+            state.collapsedCategories[category] = !state.collapsedCategories[category];
+            saveToStorage();
+            renderBookmarks();
+        }
+
+        function deleteBookmark(id) {
+            state.bookmarks = state.bookmarks.filter(bookmark => bookmark.id !== id);
+            renderBookmarks();
+            saveToStorage();
+            showNotification('Bookmark deleted', 'success');
+        }
+
+        function editBookmark(id) {
+            const bookmark = state.bookmarks.find(b => b.id === id);
+            if (!bookmark) return;
+            
+            document.getElementById('url').value = bookmark.url;
+            document.getElementById('label').value = bookmark.label;
+            document.getElementById('category').value = bookmark.category;
+            deleteBookmark(id);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function editCategory(oldCategory) {
+            state.currentCategoryToRename = oldCategory;
+            document.getElementById('new-category-name').value = oldCategory;
+            showModal('rename-modal');
+        }
+
+        function handleRenameCategory(e) {
+            e.preventDefault();
+            const newCategory = document.getElementById('new-category-name').value.trim();
+            const oldCategory = state.currentCategoryToRename;
+            
+            if (newCategory && newCategory !== oldCategory) {
+                state.bookmarks.forEach(bookmark => {
+                    if (bookmark.category === oldCategory) bookmark.category = newCategory;
+                });
+                
+                const index = state.categories.indexOf(oldCategory);
+                if (index !== -1) state.categories[index] = newCategory;
+                
+                if (state.collapsedCategories[oldCategory] !== undefined) {
+                    state.collapsedCategories[newCategory] = state.collapsedCategories[oldCategory];
+                    delete state.collapsedCategories[oldCategory];
+                }
+                
+                updateCategoryList();
+                renderBookmarks();
+                saveToStorage();
+                showNotification('Category renamed successfully', 'success');
+            }
+            
+            hideModal('rename-modal');
+        }
+
+        function showPasswordModal() {
+            if (state.bookmarks.length === 0) {
+                showNotification('No bookmarks to share', 'error');
+                return;
+            }
+            showModal('password-modal');
+        }
+
+        function handleGenerateUrl(e) {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            if (!password) {
+                showNotification('Please enter a password', 'error');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showNotification('Passwords do not match', 'error');
+                return;
+            }
+            
+            try {
+                const data = JSON.stringify(state.bookmarks);
+                const encrypted = CryptoJS.AES.encrypt(data, password).toString();
+                const baseUrl = window.location.origin + window.location.pathname;
+                const shareUrl = `${baseUrl}#${btoa(encrypted)}`;
+                
+                document.getElementById('share-url').value = shareUrl;
+                hideModal('password-modal');
+                showModal('share-modal');
+                document.getElementById('password-form').reset();
+            } catch (error) {
+                showNotification('Encryption failed', 'error');
+            }
+        }
+
+        function copyShareUrl() {
+            const input = document.getElementById('share-url');
+            input.select();
+            document.execCommand('copy');
+            showNotification('URL copied to clipboard', 'success');
+        }
+
+        function exportToHtml() {
+            if (state.bookmarks.length === 0) {
+                showNotification('No bookmarks to export', 'error');
+                return;
+            }
+            
+            let html = '<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">\n<TITLE>Bookmarks</TITLE>\n<H1>Bookmarks</H1>\n<DL><p>';
+            
+            const bookmarksByCategory = {};
+            state.bookmarks.forEach(bookmark => {
+                if (!bookmarksByCategory[bookmark.category]) bookmarksByCategory[bookmark.category] = [];
+                bookmarksByCategory[bookmark.category].push(bookmark);
+            });
+            
+            Object.keys(bookmarksByCategory).forEach(category => {
+                html += `\n    <DT><H3>${category}</H3>\n    <DL><p>`;
+                bookmarksByCategory[category].forEach(bookmark => {
+                    html += `\n        <DT><A HREF="${bookmark.url}">${bookmark.label}</A>`;
+                });
+                html += '\n    </DL><p>';
+            });
+            
+            html += '\n</DL><p>';
+            
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'xsukax-bookmarks.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('Bookmarks exported successfully', 'success');
+        }
+
+        function confirmClearAll() {
+            if (state.bookmarks.length === 0) {
+                showNotification('No bookmarks to clear', 'info');
+                return;
+            }
+            
+            document.getElementById('confirmation-message').textContent = 'Are you sure you want to delete all bookmarks? This action cannot be undone.';
+            document.getElementById('confirm-action-btn').dataset.action = 'clearAll';
+            showModal('confirmation-modal');
+        }
+
+        function handleConfirmedAction() {
+            const action = document.getElementById('confirm-action-btn').dataset.action;
+            
+            if (action === 'clearAll') {
+                state.bookmarks = [];
+                state.categories = [];
+                state.collapsedCategories = {};
+                updateCategoryList();
+                renderBookmarks();
+                saveToStorage();
+                showNotification('All bookmarks cleared', 'success');
+            }
+            
+            hideModal('confirmation-modal');
+        }
+
+        function checkForSharedBookmarks() {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                try {
+                    atob(hash);
+                    showModal('decrypt-modal');
+                } catch (e) {
+                    console.log('Invalid hash');
+                }
+            }
+        }
+
+        function handleDecryptBookmarks(e) {
+            e.preventDefault();
+            const password = document.getElementById('decrypt-password').value;
+            const hash = window.location.hash.substring(1);
+            
+            if (!password) {
+                showNotification('Please enter the password', 'error');
+                return;
+            }
+            
+            try {
+                const encrypted = atob(hash);
+                const decrypted = CryptoJS.AES.decrypt(encrypted, password).toString(CryptoJS.enc.Utf8);
+                
+                if (!decrypted) {
+                    showNotification('Invalid password', 'error');
+                    return;
+                }
+                
+                const bookmarks = JSON.parse(decrypted);
+                state.bookmarks = bookmarks;
+                state.categories = [...new Set(bookmarks.map(b => b.category))];
+                updateCategoryList();
+                renderBookmarks();
+                saveToStorage();
+                window.location.hash = '';
+                hideModal('decrypt-modal');
+                showNotification('Bookmarks loaded successfully', 'success');
+            } catch (error) {
+                showNotification('Failed to decrypt bookmarks. Invalid password or corrupted data.', 'error');
+            }
+            
+            document.getElementById('decrypt-form').reset();
+        }
+
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        function showNotification(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-50 border-green-500 text-green-800',
+                error: 'bg-red-50 border-red-500 text-red-800',
+                warning: 'bg-yellow-50 border-yellow-500 text-yellow-800',
+                info: 'bg-blue-50 border-blue-500 text-blue-800'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = `notification border-l-4 rounded-md p-4 shadow-lg ${colors[type]}`;
+            notification.innerHTML = `<p class="font-medium">${message}</p>`;
+            
+            document.getElementById('notification-container').appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 4000);
+        }
+
+        function saveToStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                bookmarks: state.bookmarks,
+                categories: state.categories,
+                collapsedCategories: state.collapsedCategories
+            }));
+        }
+
+        function loadFromStorage() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    state.bookmarks = data.bookmarks || [];
+                    state.categories = data.categories || [];
+                    state.collapsedCategories = data.collapsedCategories || {};
+                } catch (e) {
+                    console.error('Error loading data:', e);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
